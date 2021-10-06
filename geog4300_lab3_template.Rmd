@@ -15,14 +15,14 @@ library(tidyverse)
 library(tidytext)
 library(knitr)
 
-yelp_data<-read_csv("data/charlotte_restaurants.csv")
+yelp_data<-read_csv("data/charlotte_restaurants_v2_25k.csv")
 ```
 
 These data include multiple variables about businesses listed in Yelp. In this case, only restaurants are included, and there are dummy variables (0/1) for the 10 most common restaurant categories. Here's a list of them and the count of reviews in each:
 
 ```{r}
 rest_table<-yelp_data %>%
-  pivot_longer(`American (New)`:Sandwiches,
+  pivot_longer(`American..New.`:Sandwiches,
                names_to="type",
                values_to="pres") %>%
   group_by(type) %>%
@@ -35,42 +35,99 @@ kable(rest_table)
 **Question 1**: Identify the 20 most common words in these reviews, first filtering out the stopwords using an anti_join as shown in the class script for text mining. You can use the top_n function to select the 20 most common words. Use the arrange function to order your results from highest to lowest as shown in the table above. Use kable to call the table with your results when done.
 
 ```{r}
-#Code goes here.
+reviews_words <- yelp_data  %>%
+  unnest_tokens(word, text)
+
+most_common <- reviews_words %>%
+  anti_join(stop_words) %>%
+  group_by(word) %>%
+  summarise(count=n())
+
+common_top20 <-most_common %>%
+  top_n(20) %>% 
+  mutate(word=reorder(word,count)) %>%
+  arrange(-count)
+
+kable(head(common_top20))
 ```
 
 **Question 2**: Using ggplot, create a bar plot showing the frequency of these most common words. The class script on text mining has an example of how to do this using geom_col. Note that you'll have to use the reorder function (shown in the class script on text mining) to order these bars from high to low values.
 
 ```{r}
-#Code goes here
+ggplot(common_top20, aes(x=word, y=count, fill=word)) +
+  geom_bar(stat="identity") +
+  coord_flip()
 ```
 
 
 **Question 3**: Now let's compare two types of restaurants. Create two datasets--one for *five star* reviews and one for *one star* reviews--using filter with the "stars" variable. Using the same process of question 1, identify the 20 most common words (not counting stop words) in each type of review (one/five star). Use kable to call the head of your table when done.
 
 ```{r}
-#Code goes here
+fivestar_reviews <- reviews_words %>%
+  filter(stars=="5")
+
+fivestar_mostcommon <- fivestar_reviews %>%
+  anti_join(stop_words) %>%
+  group_by(word) %>%
+  summarise(count=n())
+
+fivestar_top20 <-fivestar_mostcommon %>%
+  top_n(20) %>% 
+  mutate(word=reorder(word,count))
+
+
+onestar_reviews <- reviews_words %>%
+  filter(stars=="1")
+
+onestar_mostcommon <- onestar_reviews %>%
+  anti_join(stop_words) %>%
+  group_by(word) %>%
+  summarise(count=n())
+
+onestar_top20 <- onestar_mostcommon %>%
+  top_n(20) %>% 
+  mutate(word=reorder(word,count))
+
+
+kable(head(fivestar_top20))
+kable(head(onestar_top20))
 ```
 
 
 **Question 4**: Looking at your results in question 3, identify *two* notable difference in the words used for one star and five star reviewed restaurants.
 
-{Your response goes here}
+One big difference in these data frames is the sentiment of the 20 most common words. If we performed a sentiment analysis, one star reviews would be dominated by negative words and five star reviews would be dominated by positive words. "Worst" and "horrible" are negative words that were in the top 20 list for one star reviews, and "friendly, delicious, amazing" were in the top 20 list for five star reviews. Another notable difference is that "vic" and "staff" are included in the five star list. I assume that vic is the owner of a highly rated restaurant and that he and the staff make an effort to talk to all customers, creating a friendly and welcoming atmosphere.
 
 **Question 5**: Which burger restaurants had the most positive reviews? Filter the dataset so you only have restaurants classified as Burger (meaning they have a 1 in that column). Tokenize the words used in reviews and join sentiments from the Bing sentiment dictionary. Use group_by and summarise to count the number of positive, negative, and non-rated words by restaurant name. Then make the data wider so that all three counts are separate variables. Call the head of your table when done.*
 
 ```{r}
-#Code goes here
+bing_sentiments <- get_sentiments("bing")
+
+Burgers_analysis <- yelp_data %>%
+  filter(Burgers=="1") %>%
+  unnest_tokens(word,text) %>%
+  anti_join(stop_words) %>%
+  left_join(bing_sentiments) %>%
+  group_by(name,sentiment) %>%
+  summarise(count=n()) %>%
+  pivot_wider(names_from=sentiment,
+              values_from=count,
+              values_fill=0)
+
+kable(head(Burgers_analysis))
 ```
 
 **Question 6**: Use mutate to calculate the percentage of positive words for each restaurant, dividing each by the sum of counts you calculated in question 5 (positive, negative, and non-rated). Then filter to select restaurants with at least 1,500 total words. Which restaurant had the highest percentage of positive words?
 
 ```{r}
-#Calculate the rate here
+Burgers_positive_percentage <- Burgers_analysis %>%
+  mutate(pos_rate=(positive / (negative+positive+`NA`) *100)) %>%
+  mutate(total= (negative+positive+`NA`)) %>%
+  filter(total>1500)
 ```
 
-
-{List the restaurant here.}
+For restaurants with at least 1,500 total words, Village Tavern had the highest percentage of positive words. 
 
 **Question 7**: _How do you feel about the work you did on this lab? Was it easy, moderate, or hard? What were the biggest things you learned by completing it? How would you rate it low pass/pass/high pass)?_
 
-{Your response goes here.}
+I feel like I did well on this lab. I was able to complete questions 1-4 easily and by myself. I needed a little guidance for questions 5 and 6 and then I figured out these questions. This was an easy/moderate lab- the first half was easy but question 5 was a tad more tricky since it had so many elements. I can tell that I am improving in this course and on labs. I enjoyed doing text mining and I was able to grow my understanding of this type of analysis through this lab. I do want to improve my style of coding. I spread out my data frames rather than condensing them into one new data frame (this process quickly crowds my environment tab). I think question 3 has more data frames than it really needed, however, this helps me mentally organize and process what code/analysis that I am conducting (which is especially useful as I am still learning this language). I would rate this lab a high pass. 
